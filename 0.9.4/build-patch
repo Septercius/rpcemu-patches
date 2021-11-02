@@ -1,0 +1,96 @@
+#!/bin/bash
+
+BASEDIR=../../rpcemu-dev
+SOURCEDIR=${BASEDIR}/src
+VERSION=$(cat $SOURCEDIR/rpcemu.h | grep '#define VERSION' | cut -d ' ' -f 3 | sed -e 's/\"//g')
+ORIGINALDIR=../../originals/${VERSION}
+DIFFSDIR=diffs
+EXTRASDIR=extras
+WORKDIR=tmp
+RELEASEDIR=../Releases
+
+PATCHNAME=mac-patch
+PATCHVERSION=1
+LEAFNAME=rpcemu-${VERSION}-${PATCHNAME}-v${PATCHVERSION}
+TARGET=${LEAFNAME}.patch
+PACKAGENAME=${LEAFNAME}.zip
+
+if [ -d ${DIFFSDIR} ]; then
+	rm -rf ${DIFFSDIR}
+fi
+
+if [ -d ${WORKDIR} ]; then
+	rm -rf ${WORKDIR}
+fi
+
+if [ -f ${TARGET} ]; then
+	rm ${TARGET}
+fi
+
+if [ -f ${PACKAGENAME} ]; then
+	rm ${PACKAGENAME}
+fi
+
+if [ -f ${SOURCEDIR}/qt5/Makefile ]; then
+	pushd ${SOURCEDIR}/qt5
+	make distclean
+	popd
+fi
+
+mkdir ${DIFFSDIR}
+
+echo Generating diffs...
+for f in $(find $SOURCEDIR -name "*.c" -or -name "*.h" -or -name "*.m" -or -name "*.cpp" -or -name "rpcemu.pro" | cut -d '/' -f 4-); do
+	FILENAME=$(basename $f)
+	ORIGINALFILE=$ORIGINALDIR/$f
+	NEWFILE=$BASEDIR/$f
+	DIFFPATH=$DIFFSDIR/$FILENAME
+
+	if [ "$FILENAME" != "qrc_icon.cpp" -a "$FILENAME" != "moc_predefs.h" ]; then
+		if [ -f ${ORIGINALFILE} ]; then
+			cmp -s ${ORIGINALFILE} ${NEWFILE}
+		
+			RESULT=$?
+		
+			if [ "$RESULT" == "1" ]; then
+				diff -u ${ORIGINALFILE} ${NEWFILE} > ${DIFFPATH}
+			fi
+		else
+			diff -u /dev/null ${NEWFILE} > ${DIFFPATH}
+		fi
+	fi
+done
+
+echo Updating diffs...
+for f in ${DIFFSDIR}/*; do
+sed -i '' -e "1,2 s|\.\./||g" -e "1 s|originals/${VERSION}/src|original|" -e "2 s|rpcemu-dev/||" $f
+done
+
+echo Generating patch...
+touch ${TARGET}
+for f in ${DIFFSDIR}/*; do
+	cat $f >> ${TARGET}
+done
+
+echo Building package...
+
+if [ -d ${WORKDIR} ]; then
+	rm -rf ${WORKDIR}
+fi
+
+mkdir ${WORKDIR}
+cp ${TARGET} ${WORKDIR}/
+
+if [ -d ${EXTRASDIR} ]; then
+	cp -R ${EXTRASDIR}/* ${WORKDIR}/
+fi
+
+dot_clean ${WORKDIR}/
+find ${WORKDIR} -name ".DS_Store" -delete
+
+pushd ${WORKDIR} > /dev/null
+zip -r -q ../${PACKAGENAME} *
+popd > /dev/null
+
+cp ${PACKAGENAME} ${RELEASEDIR}
+
