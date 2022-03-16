@@ -1,3 +1,5 @@
+:warning: **Attention: this repository is no longer being maintained.  There will be no further work done on the patch.  Anyone who wishes to do so is welcome to use the work in this repository to create their own patch.** :warning:
+
 # rpcemu-patches
 This repository contains the source code for various patches for RPCEmu.  These are as follows:
 
